@@ -19,9 +19,6 @@ func NewPathTree() *PathTree {
 }
 
 func splitPath(path string) []string {
-	//p := strings.TrimPrefix(path, "/")
-	//return strings.Split(p, "/")
-
 	parts := []string{}
 	for _, p := range strings.Split(path, "/") {
 		if p != "" {
@@ -35,11 +32,6 @@ func splitPath(path string) []string {
 func (t *PathTree) AddPath(path string) {
 	parts := splitPath(path)
 
-	for _, p := range parts {
-		fmt.Print(p, "-")
-	}
-	fmt.Println()
-
 	curr := t.root
 	for _, p := range parts {
 		next, ok := curr.children[p]
@@ -50,7 +42,40 @@ func (t *PathTree) AddPath(path string) {
 
 		curr = next
 	}
-	t.root.Print("")
+}
+
+func suggestNext(part string, n *node) (string, *node) {
+	suggestion := part
+
+	// if this part of the path is correct, move on to the next
+	next, ok := n.children[part]
+	if ok {
+		return suggestion, next
+	}
+
+	min := 100
+	for k, v := range n.children {
+		// This is good for the following case:
+		//
+		// Let there be /likes and /comments. If we request
+		// /c, this function will suggest /likes due to the
+		// fact that comments edit distance is larger due to
+		// the length. Hence we cut the lenght to a similar
+		// size first.
+		comp := k
+		if len(k) > len(part) {
+			comp = k[:len(part)]
+		}
+
+		dist := LevenshteinDist(comp, part)
+		if dist < min {
+			min = dist
+			next = v
+			suggestion = k
+		}
+	}
+
+	return suggestion, next
 }
 
 func (t *PathTree) Suggest(path string) (string, bool) {
@@ -64,40 +89,14 @@ func (t *PathTree) Suggest(path string) (string, bool) {
 
 	curr := t.root
 	for _, p := range parts {
-		next_sug := ""
-		next, ok := curr.children[p]
-		if !ok {
-			min := 100
-			for k, v := range curr.children {
+		nextSuggestion, next := suggestNext(p, curr)
 
-				// This is good for the following
-				// case:
-				//
-				// Let there be /likes and
-				// /comments. If we request /c, this
-				// function will suggest /likes due to
-				// the fact that comments edit
-				// distance is larger due to the
-				// length. Hence we cut the lenght to
-				// a similar size first.
-				comp := k
-				if len(k) > len(p) {
-					comp = k[:len(p)]
-				}
-
-				dist := ld(comp, p)
-				if dist < min {
-					min = dist
-					next = v
-					next_sug = k
-				}
-			}
-		}
 		if next == nil {
 			return "", false
 		}
-		if next_sug != "" {
-			suggested += "/" + next_sug
+
+		if nextSuggestion != "" {
+			suggested += "/" + nextSuggestion
 		}
 		curr = next
 	}
