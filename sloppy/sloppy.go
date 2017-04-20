@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -13,7 +14,7 @@ type Sloppy struct {
 	routes *PathTree
 }
 
-var gorillaExp = regexp.MustCompile("{.+}")
+var gorillaExp = regexp.MustCompile("{.+?}")
 
 func NewGorilla(handler *mux.Router) Sloppy {
 	routes := []string{}
@@ -61,13 +62,21 @@ func (w *interceptResponseWriter) Write(buf []byte) (int, error) {
 	if w.status != 404 {
 		return w.ResponseWriter.Write(buf)
 	}
+	env := Envelope{
+		Meta: Meta{
+			Code: 404,
+			Type: "Not Found",
+		},
+	}
 
 	suggested, ok := w.PathTree.Suggest(w.uri)
 	if ok {
-		return w.ResponseWriter.Write([]byte(`Did you mean ` + suggested))
-	} else {
-		return w.ResponseWriter.Write(buf)
+		env.Meta.Message = "Did you mean " + suggested
 	}
+
+	js, _ := json.MarshalIndent(env, "", "   ")
+	w.ResponseWriter.Header().Set("Content-Type", "application/json")
+	return w.ResponseWriter.Write(js)
 }
 
 // ServeHTTP intercepts requests before passing it on to the actual

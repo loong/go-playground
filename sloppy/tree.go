@@ -92,6 +92,7 @@ func (t *PathTree) Suggest(path string) (string, bool) {
 		nextSuggestion, next := suggestNext(p, curr)
 
 		if next == nil {
+			fmt.Println("suggested", suggested)
 			return "", false
 		}
 
